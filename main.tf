@@ -1,11 +1,11 @@
 # Configure and downloading plugins for aws
 provider "aws" {
-  region     = "us-east-1"
+  region = "us-east-1"
 }
 
 # Creating VPC
 resource "aws_vpc" "demovpc" {
-  cidr_block       = "${var.vpc_cidr}"
+  cidr_block       = var.vpc_cidr
   instance_tenancy = "default"
 
   tags = {
@@ -15,22 +15,22 @@ resource "aws_vpc" "demovpc" {
 
 # Creating Internet Gateway 
 resource "aws_internet_gateway" "demogateway" {
-  vpc_id = "${aws_vpc.demovpc.id}"
+  vpc_id = aws_vpc.demovpc.id
 }
 
 # Grant the internet access to VPC by updating its main route table
 resource "aws_route" "internet_access" {
-  route_table_id         = "${aws_vpc.demovpc.main_route_table_id}"
+  route_table_id         = aws_vpc.demovpc.main_route_table_id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = "${aws_internet_gateway.demogateway.id}"
+  gateway_id             = aws_internet_gateway.demogateway.id
 }
 
 # Creating 1st subnet 
 resource "aws_subnet" "demosubnet" {
-  vpc_id                  = "${aws_vpc.demovpc.id}"
-  cidr_block             = "${var.subnet_cidr}"
+  vpc_id                  = aws_vpc.demovpc.id
+  cidr_block              = var.subnet_cidr
   map_public_ip_on_launch = true
-  availability_zone = "us-east-1a"
+  availability_zone       = "us-east-1a"
 
   tags = {
     Name = "Demo subnet"
@@ -39,10 +39,10 @@ resource "aws_subnet" "demosubnet" {
 
 # Creating 2nd subnet 
 resource "aws_subnet" "demosubnet1" {
-  vpc_id                  = "${aws_vpc.demovpc.id}"
-  cidr_block             = "${var.subnet1_cidr}"
+  vpc_id                  = aws_vpc.demovpc.id
+  cidr_block              = var.subnet1_cidr
   map_public_ip_on_launch = true
-  availability_zone = "us-east-1b"
+  availability_zone       = "us-east-1b"
 
   tags = {
     Name = "Demo subnet 1"
@@ -53,7 +53,7 @@ resource "aws_subnet" "demosubnet1" {
 resource "aws_security_group" "demosg" {
   name        = "Demo Security Group"
   description = "Demo Module"
-  vpc_id      = "${aws_vpc.demovpc.id}"
+  vpc_id      = aws_vpc.demovpc.id
 
   # Inbound Rules
   # HTTP access from anywhere
@@ -87,7 +87,7 @@ resource "aws_security_group" "demosg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   # Replication Port
   ingress {
     from_port   = 8089
@@ -122,29 +122,23 @@ resource "aws_security_group" "demosg" {
   }
 }
 
-# Creating key pair
-resource "aws_key_pair" "demokey" {
-  key_name   = "${var.key_name}"
-  public_key = "${file(var.public_key)}"
-}
-  
+
 # Creating EC2 Instance
 resource "aws_instance" "demoinstance" {
 
   # AMI based on region 
-  ami = "${lookup(var.ami, var.aws_region)}"
+  ami = lookup(var.ami, var.aws_region)
 
   # Launching instance into subnet 
-  subnet_id = "${aws_subnet.demosubnet.id}"
+  subnet_id = aws_subnet.demosubnet.id
 
   # Instance type 
-  instance_type = "${var.instancetype}"
-  
+  instance_type = var.instancetype
+
   # Count of instance
-  count= "${var.master_count}"
-  
+  count = var.master_count
+
   # SSH key that we have generated above for connection
-  key_name = "${aws_key_pair.demokey.id}"
 
   # Attaching security group to our instance
   vpc_security_group_ids = ["${aws_security_group.demosg.id}"]
@@ -153,46 +147,18 @@ resource "aws_instance" "demoinstance" {
   tags = {
     Name = "Search-Head-${count.index + 1}"
   }
-  
+
   # Root Block Storage
   root_block_device {
     volume_size = "40"
     volume_type = "standard"
   }
-  
+
   #EBS Block Storage
   ebs_block_device {
-    device_name = "/dev/sdb"
-    volume_size = "80"
-    volume_type = "standard"
+    device_name           = "/dev/sdb"
+    volume_size           = "80"
+    volume_type           = "standard"
     delete_on_termination = false
-  }
-  
-  # SSH into instance 
-  connection {
-    
-    # Host name
-    host = self.public_ip
-    # The default username for our AMI
-    user = "ec2-user"
-    # Private key for connection
-    private_key = "${file(var.private_key)}"
-    # Type of connection
-    type = "ssh"
-  }
-  
-  # Installing splunk on newly created instance
-  provisioner "remote-exec" {
-    inline = [
-      "sudo yum update -y",
-      "sudo amazon-linux-extras install docker -y",
-      "sudo service docker start",
-      "sudo usermod -a -G docker ec2-user",
-      "sudo chkconfig docker on",
-      "sudo yum install -y git",
-      "sudo chmod 666 /var/run/docker.sock",
-      "docker pull dhruvin30/dhsoniweb:v1",
-      "docker run -d -p 80:80 dhruvin30/dhsoniweb:latest"   
-  ]
   }
 }
