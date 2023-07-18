@@ -1,6 +1,6 @@
 # Configure and downloading plugins for aws
 provider "aws" {
-  region     = "${var.aws_region}"
+  region     = "us-east-1"
 }
 
 # Creating VPC
