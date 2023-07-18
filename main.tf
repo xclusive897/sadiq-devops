@@ -121,12 +121,6 @@ resource "aws_security_group" "demosg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
-# Creating key pair
-resource "aws_key_pair" "demokey" {
-  key_name   = "${var.key_name}"
-  public_key = "${file(var.public_key)}"
-}
   
 # Creating EC2 Instance
 resource "aws_instance" "demoinstance" {
@@ -143,8 +137,6 @@ resource "aws_instance" "demoinstance" {
   # Count of instance
   count= "${var.master_count}"
   
-  # SSH key that we have generated above for connection
-  key_name = "${aws_key_pair.demokey.id}"
 
   # Attaching security group to our instance
   vpc_security_group_ids = ["${aws_security_group.demosg.id}"]
@@ -166,19 +158,6 @@ resource "aws_instance" "demoinstance" {
     volume_size = "80"
     volume_type = "standard"
     delete_on_termination = false
-  }
-  
-  # SSH into instance 
-  connection {
-    
-    # Host name
-    host = self.public_ip
-    # The default username for our AMI
-    user = "ec2-user"
-    # Private key for connection
-    private_key = "${file(var.private_key)}"
-    # Type of connection
-    type = "ssh"
   }
   
   # Installing splunk on newly created instance
